@@ -19,49 +19,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- OMEGA SSO handoff. Must be the FIRST script in the head, and served from
+     THIS origin (not clearskyomega.com) — same as the NextNRG deployment.
+     Only acts when it sees #omega_sso= in the URL; a normal visit falls
+     straight through to the usual sign-in card. See README.
 
-<!-- ══════════════ OMEGA SSO HANDOFF ══════════════════════════════════════
-     Lets clearskyomega.com hand a signed-in user straight into this portal:
-     the gateway appends #omega_sso=<idToken>, omega-sso.js trades it for a
-     custom token, signs in, and reloads clean. A normal visit has no hash and
-     nothing below runs.
-
-     TWO tags, and the order matters.
-
-     1. The INLINE guard. omega-sso.js is a module, so it is deferred and
-        cannot run first however high it sits. Without this, the portal's own
-        auth observer fires, paints the sign-in card, and THEN the SSO reload
-        happens — so the user sees a login screen flash past on their way in,
-        which reads as "it logged me out". This hides the auth screen for the
-        one paint that matters, and puts it back on the timeout in case the
-        handoff never completes.
-
-     2. The module itself, loaded from clearskyomega.com rather than copied
-        into this repo. There is one copy, on the gateway, and it is the same
-        file every hand-off target loads. A local copy here would rot the
-        first time the exchange URL changes.
-
-     On ANY failure both are inert and the normal sign-in card appears. The
-     worst case is the sign-in the user would have had anyway.
-     ═══════════════════════════════════════════════════════════════════════ -->
+     ⚠ The inline guard below has to come first, and it is not decoration.
+     omega-sso.js is a MODULE, so it is deferred and cannot run first however
+     high the tag sits. Without the guard the portal's own auth observer
+     fires, paints the sign-in card, and only THEN does the SSO reload happen
+     — so somebody arriving from the gateway watches a login screen flash past
+     on their way in, which reads as "it logged me out". This hides the auth
+     screen for that one paint, and removes itself after 6s so a failed
+     exchange leaves the normal sign-in rather than a blank page. -->
 <script>
 (function () {
-  if (location.hash.indexOf('omega_sso=') < 0) return;
+  if (location.hash.indexOf('omega_sso=') < 0) return;   // normal visit: inert
   var s = document.createElement('style');
   s.id = 'omega-sso-veil';
   s.textContent = '#auth-screen{visibility:hidden!important}';
   document.documentElement.appendChild(s);
-  /* If the exchange fails or never returns, do not leave the user staring at
-     a blank page with no way to sign in. */
   setTimeout(function () {
     var v = document.getElementById('omega-sso-veil');
     if (v && v.parentNode) v.parentNode.removeChild(v);
   }, 6000);
 })();
 </script>
-<script type="module" src="https://clearskyomega.com/omega-sso.js"></script>
-
+<script type="module" src="/omega-sso.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- Platform: ClearSky-OMEGA · Tenant resolved at runtime from /config.js -->
 <meta name="author" content="Tommy Gilmer · ClearSky Energy Solutions LLC">
 <meta name="copyright" content="© 2025 ClearSky Energy Solutions LLC. Proprietary.">
@@ -489,6 +474,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--cs-bg);color:var(--cs-tex
 .mrow label{display:block;font-size:11px;color:var(--cs-sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
 .mrow input,.mrow select{width:100%;border:1.5px solid var(--cs-border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--cs-text);background:#fff;outline:none;transition:border-color .12s}
 .mrow input:focus,.mrow select:focus{border-color:var(--cs-sky)}
+/* ── New-project scope grid ──────────────────────────────────────────────
+   The modal is 460px elsewhere; two columns of scope cards need more room
+   than that leaves, so this ONE modal is widened rather than widening every
+   modal on the page. */
+#new-proj-modal .modal{width:560px}
+.np-hint-lbl{font-weight:500;color:#9AA8B4;letter-spacing:.3px}
+.np-types{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+@media(max-width:560px){.np-types{grid-template-columns:1fr}}
+.np-type{border:1.5px solid var(--cs-border);border-radius:10px;padding:11px 13px;cursor:pointer;
+  background:#fff;text-align:left;font-family:'DM Sans',sans-serif;transition:border-color .12s,background .12s}
+.np-type:hover{border-color:#BFD4E8}
+.np-type.on{border-color:var(--cs-sky);background:#F4F9FF}
+.np-type b{display:block;font-size:13px;font-weight:700;color:var(--cs-text);letter-spacing:-.1px}
+.np-type span{display:block;font-size:11.5px;color:var(--cs-sub);margin-top:2px;line-height:1.4}
+.np-type:focus-visible{outline:2px solid var(--cs-sky);outline-offset:2px}
+/* The line that says what the editor will open with. It is not decoration:
+   the selection changes which tools the editor starts on, and a person who
+   ticks four boxes should be able to see that before they commit. */
+.np-opens{font-size:12px;color:var(--cs-sub);margin-top:10px;line-height:1.5}
+.np-opens.none{color:#B3261E}
+
 .mbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
 .mb-cancel{background:#F4F1EC;border:1px solid var(--cs-border);color:var(--cs-sub);border-radius:8px;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif}
 .mb-create{background:var(--cs-navy);color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:background .12s}
@@ -2176,14 +2182,28 @@ window._omegaReady = function(){
       <label>Site Address</label>
       <input id="np-addr" placeholder="e.g. 1234 Main St, Clinton, IA 52732">
     </div>
+    <!-- ══ PROJECT TYPE — MULTI-SELECT ═══════════════════════════════════
+         Was a single <select>. A real site is rarely one thing: a solar
+         array with a battery behind it and a bank of chargers on the same
+         service was three separate projects under the old control, or one
+         project mislabelled as whichever the person picked first.
+
+         The grid writes TWO fields, and they are not interchangeable:
+           type        ONE legacy string — 'bess' | 'solar' | 'dcfc' | …
+                       Every existing project has it and the dashboard's
+                       "Projects by Type" doughnut still rolls up on it.
+                       Derived from the selection by primaryType().
+           siteScopes  the FULL array of what the site contains.
+
+         siteScopes, not `scopes`. `scopes` on a project document already
+         means the DELIVERABLES asked for on an intake — the ops console and
+         omega-delivery.js both write it that way. Two vocabularies in one
+         field would have made every screening panel read site hardware as
+         requested packages. Different meaning, different field.        -->
     <div class="mrow">
-      <label>Project Type</label>
-      <select id="np-type">
-        <option value="bess">BESS – Battery Energy Storage System</option>
-        <option value="dcfc">DCFC – DC Fast Charging</option>
-        <option value="solar">Solar + Storage</option>
-        <option value="other">Other</option>
-      </select>
+      <label>Project Type <span class="np-hint-lbl">&mdash; pick everything this site includes</span></label>
+      <div class="np-types" id="np-types"></div>
+      <div class="np-opens" id="np-opens"></div>
     </div>
     <div class="mrow">
       <label>Client / Customer</label>
@@ -4124,14 +4144,127 @@ function pmSoon(name, el) {
 }
 window.pmSoon = pmSoon;
 
-// ══════════ NEW PROJECT MODAL (UNCHANGED) ══════════
-let newProjType = 'bess';
-function openNewProjectModal(type) {
-  newProjType = type;
-  document.getElementById('np-type').value = type;
-  document.getElementById('new-proj-modal').classList.add('on');
-  setTimeout(()=>document.getElementById('np-name').focus(), 100);
+// ══════════ NEW PROJECT MODAL ══════════
+/* SITE SCOPES — what a project can contain. Order here is the render order
+   and, deliberately, also the precedence order used by primaryType(): the
+   thing that most defines a site sits first.
+
+   `key` is written into siteScopes and is permanent once projects carry it.
+   `legacy` is what that scope collapses to in the old single `type` field —
+   several map onto themselves, and DER/Solar maps to 'solar' because that is
+   the value already in every existing solar project and in the doughnut's
+   colour map. Changing it would orphan the chart, not improve it.
+
+   `opens` is the phrase used in the "Opens with …" line. It describes the
+   EDITOR, so if the editor's tooling changes these are the strings to fix. */
+var NP_SCOPES = [
+  { key:'der',       legacy:'solar',     label:'DER / Solar',
+    desc:'PV, wind, generation on site',        opens:'solar & DER layout' },
+  { key:'bess',      legacy:'bess',      label:'Storage / BESS',
+    desc:'Batteries, PCS, EMS',                 opens:'BESS build + sizer' },
+  { key:'compute',   legacy:'compute',   label:'Data centre / Compute',
+    desc:'Compute blocks, load profile',        opens:'compute blocks + load profile' },
+  { key:'dcfc',      legacy:'dcfc',      label:'DCFC',
+    desc:'480V 3\u00D8 fast charging',          opens:'DC fast-charging layout' },
+  { key:'l2',        legacy:'l2',        label:'Level 2 EV',
+    desc:'240V 1\u00D8 off an existing service',opens:'Level 2 charging layout' },
+  { key:'microgrid', legacy:'microgrid', label:'Microgrid',
+    desc:'Islanding, transfer, critical loads', opens:'microgrid one-line' }
+];
+
+var npSelected = {};
+
+/* The legacy single `type`, derived rather than asked for. First scope in
+   NP_SCOPES order wins, so a solar + storage + charging site reads as
+   'solar' — the same answer the old dropdown would have given for the same
+   site, which is what keeps historical charts comparable. */
+function npPrimaryType() {
+  for (var i = 0; i < NP_SCOPES.length; i++) {
+    if (npSelected[NP_SCOPES[i].key]) return NP_SCOPES[i].legacy;
+  }
+  return 'other';
 }
+
+function npSelectedKeys() {
+  var out = [];
+  for (var i = 0; i < NP_SCOPES.length; i++) {
+    if (npSelected[NP_SCOPES[i].key]) out.push(NP_SCOPES[i].key);
+  }
+  return out;
+}
+
+function npPaintOpens() {
+  var el = document.getElementById('np-opens');
+  if (!el) return;
+  var parts = [];
+  for (var i = 0; i < NP_SCOPES.length; i++) {
+    if (npSelected[NP_SCOPES[i].key]) parts.push(NP_SCOPES[i].opens);
+  }
+  if (!parts.length) {
+    el.className = 'np-opens none';
+    el.textContent = 'Pick at least one, so the editor knows which tools to open with.';
+    return;
+  }
+  el.className = 'np-opens';
+  var list = parts.length === 1 ? parts[0]
+           : parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
+  el.textContent = 'Opens with ' + list + '.';
+}
+
+function npToggle(key) {
+  npSelected[key] = !npSelected[key];
+  var b = document.querySelector('.np-type[data-k="' + key + '"]');
+  if (b) {
+    b.classList.toggle('on', !!npSelected[key]);
+    b.setAttribute('aria-pressed', npSelected[key] ? 'true' : 'false');
+  }
+  npPaintOpens();
+}
+
+function npRenderTypes() {
+  var host = document.getElementById('np-types');
+  if (!host || host.getAttribute('data-built')) return;
+  var html = '';
+  for (var i = 0; i < NP_SCOPES.length; i++) {
+    var s = NP_SCOPES[i];
+    html += '<button type="button" class="np-type" data-k="' + s.key + '" aria-pressed="false">'
+          + '<b>' + escHtml(s.label) + '</b><span>' + escHtml(s.desc) + '</span></button>';
+  }
+  host.innerHTML = html;
+  var btns = host.querySelectorAll('.np-type');
+  for (var j = 0; j < btns.length; j++) {
+    (function (b) {
+      b.onclick = function () { npToggle(b.getAttribute('data-k')); };
+    })(btns[j]);
+  }
+  host.setAttribute('data-built', '1');
+}
+
+function openNewProjectModal(type) {
+  npRenderTypes();
+
+  /* Callers still pass a single seed type — the quick link passes 'bess',
+     the tool registry passes 'bess' or 'sandbox'. Seed the matching card and
+     let the user add to it. 'sandbox' matches nothing, which is correct: a
+     sandbox is deliberately undecided, and the "pick at least one" line asks
+     rather than assuming a battery. */
+  npSelected = {};
+  for (var i = 0; i < NP_SCOPES.length; i++) {
+    var s = NP_SCOPES[i];
+    if (s.key === type || s.legacy === type) npSelected[s.key] = true;
+  }
+  var btns = document.querySelectorAll('#np-types .np-type');
+  for (var j = 0; j < btns.length; j++) {
+    var on = !!npSelected[btns[j].getAttribute('data-k')];
+    btns[j].classList.toggle('on', on);
+    btns[j].setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  npPaintOpens();
+
+  document.getElementById('new-proj-modal').classList.add('on');
+  setTimeout(function(){ document.getElementById('np-name').focus(); }, 100);
+}
+
 function closeNewProjectModal() {
   document.getElementById('new-proj-modal').classList.remove('on');
 }
@@ -4139,9 +4272,14 @@ function closeNewProjectModal() {
 async function createProject() {
   const name = document.getElementById('np-name').value.trim();
   const addr = document.getElementById('np-addr').value.trim();
-  const type = document.getElementById('np-type').value;
   const client = document.getElementById('np-client').value.trim();
+  const siteScopes = npSelectedKeys();
+  const type = npPrimaryType();
   if (!name) { alert('Please enter a project name.'); return; }
+  if (!siteScopes.length) {
+    alert('Pick at least one project type, so the editor knows which tools to open with.');
+    return;
+  }
 
   try {
     const ref = await db.collection('projects').add({
@@ -4150,6 +4288,9 @@ async function createProject() {
       ownerEmail: (currentUser.email||'').toLowerCase(),  // per-user scope key ("My Projects")
       ownerName: _meName(),                                 // friendly owner label for tables
       name, address: addr, type, client,
+      /* The full picture. `type` above is the one-word legacy summary that
+         existing rollups read; this is what the site actually contains. */
+      siteScopes: siteScopes,
       stage: 'candidate', // seed pipeline stage so the dashboard can roll it up
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -5053,7 +5194,12 @@ var DASH = (function(){
     if(typeof Chart==='undefined') return;
     if(_dch[el.id]){ try{_dch[el.id].destroy();}catch(e){} }
     var STAGE=(typeof STAGE_KEYS!=='undefined')?STAGE_KEYS:[]; var LBL=(typeof STAGE_LABEL!=='undefined')?STAGE_LABEL:{};
-    var SC=['#0070F2','#1B90FF','#00A9A4','#00C4BC','#F0A030','#E06C4F','#2E9C3C','#6B4FA0']; var TC={bess:'#0070F2',dcfc:'#00A9A4',solar:'#F0A030',other:'#8A97A6'};
+    var SC=['#0070F2','#1B90FF','#00A9A4','#00C4BC','#F0A030','#E06C4F','#2E9C3C','#6B4FA0']; /* One colour per legacy `type` value. The three new ones arrived with the
+   multi-select scope grid; without them compute, l2 and microgrid all fall
+   through to the grey fallback and the doughnut shows three identical
+   slices with three different labels. */
+var TC={bess:'#0070F2',dcfc:'#00A9A4',solar:'#F0A030',
+        compute:'#6B4FA0',l2:'#2E9C3C',microgrid:'#E06C4F',other:'#8A97A6'};
     var cfg=null;
     if(type==='stage'){var L=[],D=[],C=[];STAGE.forEach(function(s,i){var v=(a.counts&&a.counts[s])||0;if(v>0){L.push(LBL[s]||s);D.push(v);C.push(SC[i%SC.length]);}});var t=D.reduce(function(x,y){return x+y;},0);cfg={type:'doughnut',data:{labels:t?L:['No data'],datasets:[{data:t?D:[1],backgroundColor:t?C:['#EAECEF'],borderWidth:0}]},options:{cutout:'64%',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}}};}
     else if(type==='ptype'){var ks=Object.keys(a.byType||{}),L2=[],D2=[],C2=[];ks.forEach(function(k){L2.push(k.toUpperCase());D2.push(a.byType[k]);C2.push(TC[k]||'#8A97A6');});var t2=D2.reduce(function(x,y){return x+y;},0);cfg={type:'doughnut',data:{labels:t2?L2:['No data'],datasets:[{data:t2?D2:[1],backgroundColor:t2?C2:['#EAECEF'],borderWidth:0}]},options:{cutout:'64%',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}}};}

@@ -511,6 +511,27 @@
      client is another Omega tenant with their own portal to see it in. Here
      the tenant's customer has no Omega account at all, so the project belongs
      to the tenant and the customer's name is carried in `client`. */
+  /* A referral's `projectType` is a TECHNOLOGY (what the site is). The New
+     Project modal in index.html records the same idea as `siteScopes`, using
+     its own key set, and the editor opens its tools from those. Seeding them
+     here is what makes a referral pushed from the queue open the same way as
+     one created by hand — otherwise the editor starts blank and somebody has
+     to re-state a fact the referral already carried.
+
+     Note `siteScopes` and `scopes` are DIFFERENT fields on purpose. `scopes`
+     is the deliverables/service lines asked for, which is what the ops
+     console reads. Site hardware and requested packages are two vocabularies
+     and must not share a field. */
+  var SITE_SCOPES_FOR = {
+    solar:   ['der'],
+    wind:    ['der'],
+    bess:    ['bess'],
+    hybrid:  ['der', 'bess'],
+    compute: ['compute'],
+    ev:      ['l2'],
+    other:   []
+  };
+
   function createLinkedProject(r) {
     var d = db();
     if (!d) return Promise.reject(new Error('No database connection.'));
@@ -524,7 +545,8 @@
       name:       r.projectName || 'Untitled project',
       address:    r.address || '',
       stage:      'candidate',
-      scopes:     r.scopes || [],
+      scopes:     r.scopes || [],                  // service lines requested
+      siteScopes: SITE_SCOPES_FOR[t] || [],        // what the site contains
       type:       (t === 'ev') ? 'EV' : 'BESS',
       client:     r.clientName || '',
       source:     'referral',

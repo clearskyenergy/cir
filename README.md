@@ -78,22 +78,80 @@ and `tierLevel: 3`.
 | `cir-logo-white.png` | tenant asset | Your original, for dark backgrounds |
 | `omega-logo.png` | platform asset | ClearSky-OMEGA mark |
 
-### index.html has forked by three additions
+### The New Project modal — multi-select project type
 
-Two are the delivery console and the SSO handoff (both below). All three are
-tenant-neutral and belong upstream. Until they're copied to the shared source
-and back down, this repo differs from Walters by exactly these:
+The `index.html` you sent still carried the **old single dropdown** (`BESS –
+Battery Energy Storage System / DCFC / Solar + Storage / Other`), so CIR was
+opening the editor from a different modal than the live Walters deployment.
+Your live Walters is ahead of the file. The grid is rebuilt here to match it:
+
+| Key | Card | Sub |
+|---|---|---|
+| `der` | DER / Solar | PV, wind, generation on site |
+| `bess` | Storage / BESS | Batteries, PCS, EMS |
+| `compute` | Data centre / Compute | Compute blocks, load profile |
+| `dcfc` | DCFC | 480V 3Ø fast charging |
+| `l2` | Level 2 EV | 240V 1Ø off an existing service |
+| `microgrid` | Microgrid | Islanding, transfer, critical loads |
+
+Plus the "Opens with …" line, now assembled from the selection rather than
+hardcoded — tick three and it reads *"Opens with solar & DER layout, BESS
+build + sizer and DC fast-charging layout."*
+
+**Two fields are written, and they are not interchangeable.**
+
+`type` — **one** legacy string, derived not asked for. Every existing project
+has it, and the dashboard's *Projects by Type* doughnut still rolls up on it.
+`npPrimaryType()` takes the first selected scope in card order, so a
+solar+storage+charging site reads `'solar'` — the same answer the old dropdown
+would have given for the same site, which is what keeps historical charts
+comparable. DER/Solar deliberately collapses to `'solar'` rather than `'der'`
+for the same reason.
+
+`siteScopes` — the **full array** of what the site contains.
+
+**`siteScopes`, not `scopes`.** `scopes` on a project document already means
+the *deliverables* requested — that's what `ops-data.js` writes on the ops
+console, and what `omega-delivery.js` writes on the referral handoff. Site
+hardware and requested packages are two vocabularies, and sharing a field
+would have made every screening panel read a battery as a requested package.
+Different meaning, different field. The referral→editor handoff now writes
+both, mapping referral technology onto site scopes (`hybrid` → `['der','bess']`
+and so on), so a job pushed from the queue opens the same way as one created
+by hand.
+
+**Also patched:** the doughnut's colour map had entries for `bess`, `dcfc`,
+`solar` and `other` only. `compute`, `l2` and `microgrid` would all have
+fallen through to the grey fallback — three identical slices with three
+different labels. Colours added.
+
+A sandbox seeds **nothing** selected, on purpose: a sandbox is deliberately
+undecided, and the line asks rather than assuming a battery. Create is blocked
+until at least one is picked.
+
+### index.html has forked by four additions
+
+All four are tenant-neutral and belong upstream. Until they're copied to the
+shared source and back down, this repo differs from the `index.html` you sent
+by exactly these:
 
 ```html
-<script>…SSO veil guard…</script>                              <!-- head, first -->
-<script type="module" src="https://clearskyomega.com/omega-sso.js"></script>
-<script src="/omega-delivery.js"></script>                     <!-- beside omega-assets.js -->
+<script>…SSO veil guard…</script>          <!-- head, immediately before omega-sso.js -->
+<script src="/omega-delivery.js"></script> <!-- beside omega-assets.js -->
 ```
 
-Everything else is byte-identical:
+plus the multi-select Project Type grid (markup, CSS and the modal JS), and
+the extra entries in the `TC` colour map.
+
+`<script type="module" src="/omega-sso.js">` was **already** in the file you
+sent — served from this origin, first in `<head>`, as the comment there
+requires. I've followed that rather than the gateway-hosted copy, and
+`omega-sso.js` ships in this repo.
+
+Everything else is byte-identical to the files you sent:
 
 ```
-shasum marketplace.html projects.html editor.html omega-brand.js omega-terms.js omega-assets.js
+shasum marketplace.html projects.html editor.html omega-brand.js omega-terms.js omega-assets.js omega-sso.js
 ```
 
 ### Grid Atlas and Site Finder are not in this repo
@@ -309,7 +367,7 @@ Two tags in `<head>`, and **the order matters**:
 
 ```html
 <script>…inline veil guard…</script>
-<script type="module" src="https://clearskyomega.com/omega-sso.js"></script>
+<script type="module" src="/omega-sso.js"></script>
 ```
 
 **Why the inline guard exists.** `omega-sso.js` is a module, so it is deferred
@@ -323,10 +381,11 @@ seconds so a failed exchange doesn't strand somebody on a blank page.
 Verified headlessly: the veil appears only when the URL carries
 `#omega_sso=`, and a normal load is untouched.
 
-**Why the module is loaded from clearskyomega.com and not copied here.** One
-copy, on the gateway, shared by every hand-off target. A local copy would rot
-the first time the exchange URL changes — and the header of that file says the
-v1 Cloud Function URL is the thing most likely to move.
+**`omega-sso.js` is served from this origin**, per the comment already in the
+file you sent and matching the NextNRG deployment. That means it is a copy,
+and copies rot: the `EXCHANGE` constant inside it is a hardcoded v1 Cloud
+Function URL, which is the line most likely to move. When it does, it has to
+be re-copied to every hand-off target — this repo included.
 
 On any failure both are inert and the normal sign-in card appears. The worst
 case is the sign-in the user would have had anyway.
