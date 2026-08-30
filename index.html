@@ -20,6 +20,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- ══════════════ OMEGA SSO HANDOFF ══════════════════════════════════════
+     Lets clearskyomega.com hand a signed-in user straight into this portal:
+     the gateway appends #omega_sso=<idToken>, omega-sso.js trades it for a
+     custom token, signs in, and reloads clean. A normal visit has no hash and
+     nothing below runs.
+
+     TWO tags, and the order matters.
+
+     1. The INLINE guard. omega-sso.js is a module, so it is deferred and
+        cannot run first however high it sits. Without this, the portal's own
+        auth observer fires, paints the sign-in card, and THEN the SSO reload
+        happens — so the user sees a login screen flash past on their way in,
+        which reads as "it logged me out". This hides the auth screen for the
+        one paint that matters, and puts it back on the timeout in case the
+        handoff never completes.
+
+     2. The module itself, loaded from clearskyomega.com rather than copied
+        into this repo. There is one copy, on the gateway, and it is the same
+        file every hand-off target loads. A local copy here would rot the
+        first time the exchange URL changes.
+
+     On ANY failure both are inert and the normal sign-in card appears. The
+     worst case is the sign-in the user would have had anyway.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (location.hash.indexOf('omega_sso=') < 0) return;
+  var s = document.createElement('style');
+  s.id = 'omega-sso-veil';
+  s.textContent = '#auth-screen{visibility:hidden!important}';
+  document.documentElement.appendChild(s);
+  /* If the exchange fails or never returns, do not leave the user staring at
+     a blank page with no way to sign in. */
+  setTimeout(function () {
+    var v = document.getElementById('omega-sso-veil');
+    if (v && v.parentNode) v.parentNode.removeChild(v);
+  }, 6000);
+})();
+</script>
+<script type="module" src="https://clearskyomega.com/omega-sso.js"></script>
+
 <!-- Platform: ClearSky-OMEGA · Tenant resolved at runtime from /config.js -->
 <meta name="author" content="Tommy Gilmer · ClearSky Energy Solutions LLC">
 <meta name="copyright" content="© 2025 ClearSky Energy Solutions LLC. Proprietary.">
@@ -2279,6 +2321,10 @@ window._omegaReady = function(){
      wraps computeLiveRollup, so it polls briefly for both rather than
      assuming script order. Configured under tenant.assets in /config.js. -->
 <script src="/omega-assets.js"></script>
+<!-- Service Delivery Console. Dark unless tenant.delivery.enabled is true in
+     /config.js, so this tag is inert on every tenant that hasn't asked for it
+     — same contract as omega-assets.js above. -->
+<script src="/omega-delivery.js"></script>
 <script src="https://tools.csebuilders.com/omega-tools.js?v=8"></script>
 
 <script>

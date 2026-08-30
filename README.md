@@ -5,13 +5,15 @@ Industry Resources (CIR)** ([cleantechir.com](https://cleantechir.com)).
 
 CIR is a Burlington, Vermont development-and-engineering services firm — legal
 entity Solar Industry Resources, LLC — that sells renewable project
-*development-as-a-service*: site diligence, interconnection, permitting and
-systems engineering, run on a 24-hour cycle across national portfolios. They
-don't own the assets. They advance other people's projects and hand them back.
+*development-as-a-service*: siting and diligence, systems engineering,
+interconnection, permitting, estimating and construction management, run on a
+24-hour cycle across national portfolios. They don't own the assets. They
+advance other people's projects and hand them back.
 
-So this trial opens the three tools that map to the front of a development
-engagement — find the site, read the grid around it, design what goes on it —
-and deliberately leaves the ownership dashboard off.
+That shape is what this deployment is built around. The stock portal tracks
+sites a tenant is developing **for itself**. CIR needs the opposite: a book of
+work referred in **by its customers**, moving through defined service lines,
+with the editor at the end of it.
 
 ---
 
@@ -26,34 +28,28 @@ and deliberately leaves the ownership dashboard off.
 | Expires | **Sat Oct 31, 2026, 00:00** local |
 | On expiry | Banner only — access continues (`lockOnExpiry: false`) |
 
-The countdown banner moves through four states: blue before Sep 1, amber Sep 1
-through Oct 23, red for the last seven days (Oct 24–30), grey from Oct 31.
+Banner states: blue before Sep 1, amber Sep 1–Oct 23, red for the last seven
+days (Oct 24–30), grey from Oct 31.
 
-Today is Aug 30, so the account ships in its **pre-start** state — the banner
-will read "60 days left in your 60-day trial · starts Sep 1, 2026". That is
-correct, not a bug: `notStarted` reports the full allotment rather than the
-calendar distance to the end. **Sign-in is not blocked before the start date.**
-If CIR is given the URL this week they can get in immediately and the clock
-still won't begin until Sep 1. If that isn't what you want, don't hand over the
-link until Monday — there is no config flag for "not yet open".
+Today is Aug 30, so the account ships **pre-start**: the banner reads "60 days
+left in your 60-day trial · starts Sep 1, 2026". That's correct, not a bug —
+`notStarted` reports the full allotment rather than the calendar distance to
+the end. **Sign-in is not blocked before the start date.** Hand over the URL
+this week and they can get in immediately with the clock still not running.
+There is no config flag for "not yet open"; if that matters, don't send the
+link until Monday.
 
 ### Cutting access off at expiry
-
-`lockOnExpiry: false` is deliberate: the trial lapsing shows a banner but does
-**not** lock anyone out. To make expiry hard, set it to `true` in `config.js`:
 
 ```js
 trial: { startsAt: '2026-09-01', days: 60, lockOnExpiry: true }
 ```
 
-From Oct 31 every CIR sign-in is then refused with a message pointing at
-`dev@clearsky-usa.com`. Domains in `adminDomains` keep access regardless.
+From Oct 31 every CIR sign-in is then refused, pointing at
+`dev@clearsky-usa.com`. `adminDomains` keep access regardless.
 
-### Extending the trial
-
-Change `days`, or move `startsAt`. Both take effect on next page load — no
-rebuild. To convert to a paid account, drop the `trial` block entirely and set
-`accountTier: 'Enterprise'` with `tierLevel: 3`.
+To convert to paid: drop the `trial` block, set `accountTier: 'Enterprise'`
+and `tierLevel: 3`.
 
 ---
 
@@ -61,182 +57,424 @@ rebuild. To convert to a paid account, drop the `trial` block entirely and set
 
 | File | Shared? | Notes |
 |---|---|---|
-| `index.html` | shared **+1 line** | Portal dashboard — carries the `omega-assets.js` script tag |
+| `index.html` | shared **+3 additions** | Portal dashboard — SSO handoff + delivery script |
 | `marketplace.html` | **shared** | App marketplace |
 | `projects.html` | **shared** | Project list |
-| `editor.html` | **shared** | BESS Site Map application — served same-origin |
+| `editor.html` | **shared** | BESS Site Map — served same-origin |
 | `omega-brand.js` | **shared** | Tenant resolution + branding |
 | `omega-terms.js` | **shared** | Terms of Service gate |
-| `omega-assets.js` | **shared** | Asset Owner Command Center — **present but disabled** |
-| `firestore-terms.rules` | shared | Terms acceptance rule |
-| `firestore-assets.rules` | shared | `financeOffers` rule |
-| `firestore-capacity.rules` | shared — **NEW** | `capacityAllocations` rule for Site Finder |
+| `omega-assets.js` | **shared** | Asset Owner Command Center — present, **disabled** |
+| `omega-delivery.js` | **shared — NEW** | Service Delivery Console (model + dashboard block) |
+| `intake.html` | **shared — NEW** | Log a referral |
+| `queue.html` | **shared — NEW** | The service queue |
+| `firestore-terms.rules` | shared | Terms acceptance |
+| `firestore-assets.rules` | shared | `financeOffers` |
+| `firestore-capacity.rules` | shared | `capacityAllocations` — Site Finder |
+| `firestore-delivery.rules` | shared — **NEW** | `referrals` — the delivery console |
+| `storage.rules` | shared — **NEW** | Referral attachments — **separate deploy** |
+| `check-delivery.js` | dev tool | Validates the module without a browser |
 | `config.js` | **tenant-specific** | The only file to edit |
-| `cir-logo.png` | tenant asset | Topbar + sign-in mark (dark ink — see below) |
+| `cir-logo.png` | tenant asset | Topbar + sign-in (dark ink — see below) |
 | `cir-logo-white.png` | tenant asset | Your original, for dark backgrounds |
 | `omega-logo.png` | platform asset | ClearSky-OMEGA mark |
 
-Byte-identical to the Walters repo, including `index.html`. Verify before you
-cut the next one:
+### index.html has forked by three additions
+
+Two are the delivery console and the SSO handoff (both below). All three are
+tenant-neutral and belong upstream. Until they're copied to the shared source
+and back down, this repo differs from Walters by exactly these:
+
+```html
+<script>…SSO veil guard…</script>                              <!-- head, first -->
+<script type="module" src="https://clearskyomega.com/omega-sso.js"></script>
+<script src="/omega-delivery.js"></script>                     <!-- beside omega-assets.js -->
+```
+
+Everything else is byte-identical:
 
 ```
-shasum index.html marketplace.html projects.html editor.html \
-       omega-brand.js omega-terms.js omega-assets.js
+shasum marketplace.html projects.html editor.html omega-brand.js omega-terms.js omega-assets.js
 ```
-
-### Why omega-assets.js ships even though it's off
-
-`index.html` loads `/omega-assets.js` unconditionally. Omitting the file would
-404 on every page load for no benefit. Shipping it and setting
-`assets.enabled: false` keeps `index.html` byte-identical across tenants and
-costs one no-op script. The module checks `enabled` before it mounts anything,
-so nothing renders and nothing is read.
 
 ### Grid Atlas and Site Finder are not in this repo
 
-Both resolve through `OMEGATools.hrefFor()` to
-`https://tools.csebuilders.com` + their file, plus `?org=cleantechir.com`.
-They live on the shared tool host and are updated there once for every tenant.
-Only `editor.html` is same-origin (`action: 'new:bess'` opens the project modal,
-which navigates to `/editor.html?id=…`), which is why it's the one application
-file in the repo.
+Both resolve through `OMEGATools.hrefFor()` to `https://tools.csebuilders.com`
++ their file, plus `?org=cleantechir.com`. Only `editor.html` is same-origin,
+because `action: 'new:bess'` opens the project modal, which navigates to
+`/editor.html?id=…`.
 
 ---
 
-## ⚠ Before this goes live — read this section first
+## The Service Delivery Console
 
-### 1. Confirm `sitefinder` is in the deployed catalog. This is the one that will bite.
+This is what makes the account CIR-shaped. `omega-delivery.js` adds a block
+directly under My Applications, and two pages hang off it.
 
-`OMEGATools.hydrate()` does this:
+### The three pieces
 
-```js
-db.collection('tools').orderBy('sort').get().then(function (snap) {
-  if (!snap.empty) { self._tools = list; }   // ← wholesale REPLACEMENT
-});
+**Dashboard block** — open jobs, awaiting reply, median first response, late,
+in production, delivered. Then open work **by service line**, the pipeline,
+and the top of the queue.
+
+**`/intake.html`** — log a referral by hand. Customer, contact, project,
+technology, site, capacity, service lines, priority, due date, files, notes.
+Only the project name is required: a referral with a name and nothing else is
+still a referral, and blocking on detail nobody has yet is how work goes
+unlogged. Customer names autocomplete from the existing queue so the same
+customer doesn't end up spelled three ways across a quarter.
+
+**`/queue.html`** — the queue, filtered by service line. Change status, and
+push a referral into the editor.
+
+### ⚠ This is NOT the Omega project intake
+
+Deliberately, and it is the thing most worth understanding about this repo.
+
+`intake_projects` is **ClearSky's** delivery queue: the ops console reads it,
+your staff are measured on its SLA, and it carries commission, quoting and
+assignment. Records there are work ClearSky owes somebody a reply on.
+
+CIR's referrals go to a **separate collection** — `delivery.collection`, set
+to `referrals`. Nothing logged here reaches the ops console, starts a ClearSky
+response clock, or puts CIR's customers in front of ClearSky staff.
+
+Pointing `delivery.collection` at `intake_projects` to "unify the queues"
+would not be a unification. It would drop a trial tenant's customers into your
+worklist, start SLA clocks on jobs nobody at ClearSky owes a reply to, and the
+first symptom would be your median first-reply going strange for reasons
+nobody could trace. The warning is written into the config, the module header
+and the rules file, in all three places on purpose.
+
+**Graduating CIR onto the real intake later is a document copy, not a
+translation.** The status *keys* in `omega-delivery.js` deliberately mirror
+`intake_projects`' vocabulary — `submitted`, `in_review`, `quoted`,
+`accepted`, `in_production`, `delivered`, `declined` — even though the labels
+read differently for a services firm ("Referred" for `submitted`, "Scoping"
+for `in_review`). `check-delivery.js` asserts the two lists still match.
+
+### Service lines
+
+Ten, in `delivery.services`, assembled from CIR's published catalogue:
+
+| Key | Label |
+|---|---|
+| `siting` | Siting & screening |
+| `diligence` | Site diligence / DDR |
+| `engineering` | Systems engineering |
+| `interconnection` | Interconnection |
+| `permitting` | Permitting & AHJ |
+| `estimating` | Estimating & bidding |
+| `financial` | Financial modeling |
+| `sitereview` | Dispatch: site review |
+| `construction` | Construction management |
+| `legal` | Legal & land support |
+
+**Confirm this list with CIR in the kickoff call.** Their product page is a
+client-rendered React app, so this came from their own descriptions elsewhere
+— and a catalogue of a services firm's own work with something missing is the
+first thing they'll notice.
+
+**Keys are written onto every referral.** Renaming one orphans every record
+that used it. The queue tags orphans in red under *Needs scoping* rather than
+hiding them, but it's still a migration. Change labels freely; change keys
+deliberately.
+
+A referral counts once **per service line**, so the per-service total runs
+ahead of the referral count — one site can carry four. That's what makes load
+per service readable, and the block says so under the numbers.
+
+### Three things the queue refuses to fudge
+
+**Answered-but-unmeasured is not zero.** A referral already at `quoted` or
+beyond with no `firstResponseAt` was clearly answered — somebody priced it —
+but its response time reads `—`, not `0`. Counting it as zero would flatter
+the median with work nobody measured. The count of those prints under *Median
+reply* so the gap is visible rather than silent.
+
+**No service line is not a small job.** A referral with nothing ticked is an
+unanswered question about what the customer actually asked for. It gets its
+own *Needs scoping* tab rather than being folded in with real work.
+
+**Derived due dates are marked.** Left blank, the queue derives one from
+priority and prints an asterisk, so nobody mistakes a working target for a
+commitment the customer made.
+
+### The response clock
+
+`submittedAt` → `firstResponseAt`. First reply, not delivery.
+
+It is **not retroactive** — referrals logged before this shipped read `—`
+forever. `firstResponseAt` is stamped automatically the first time a referral
+moves off `submitted`, because asking for a separate click is how the metric
+ends up never recorded. It is **write-once in the rules**: without that, the
+person being measured can move the number that measures them, and on a
+single-tenant book of work there's no second party to notice.
+
+Targets are wall-clock, not business hours:
+
+| Priority | Target |
+|---|---|
+| Critical | 2 h |
+| Rush | 8 h |
+| Standard | 24 h |
+
+Amber at 60%, red past it, and the clock keeps counting into overtime rather
+than parking at 100% — a 20-minute miss and a two-day miss shouldn't look the
+same.
+
+**CIR's own pitch is a 24-hour work cycle and deliverables in a third of the
+usual time**, so a 24h standard target is their claim rather than an arbitrary
+one. If they'd rather not be measured against their own marketing during a
+trial, raise it before the demo. Raising it quietly after the first miss is
+worse than setting it honestly now.
+
+A standard referral landing 6pm Friday is amber by Saturday lunchtime with
+nobody at fault. Once volume makes that unfair, add a business-hours calendar
+in `omega-delivery.js` — not a longer target, which would also slacken the
+weekday number that matters.
+
+### Files
+
+Two kinds of attachment, both on `/intake.html`:
+
+- **Uploads** — drag-drop or file picker, to Firebase Storage at
+  `referrals/{orgId}/{referralId}/{filename}`. Capped at 25 MB.
+- **Links** — Drive, Dropbox, anywhere. Stored as a URL.
+
+Files are held in memory until submit and uploaded **after** the referral
+document exists. Uploading first would orphan an object in Storage every time
+somebody opens the form and closes it, with no document to clean up from. If
+an upload fails the referral is already saved — you get a referral with no
+files rather than no referral.
+
+The 25 MB cap is about the browser, not Storage: past that, a field connection
+stalls long enough that people reload the form and lose it. The cap is
+enforced in **both** `/intake.html` and `storage.rules`; raising one without
+the other means the form accepts a file the rules then refuse.
+
+Set `delivery.uploads: false` for links only — the page says so plainly rather
+than failing on click.
+
+### Editor handoff
+
+**Start in editor** on a queue row creates a `projects` document and links the
+two (`referralId` on the project, `editorProjectId` on the referral), then
+navigates to `/editor.html?id=…`. The referral moves to `in_production`.
+
+The project is stamped with **CIR's** orgId, not the customer's — unlike the
+ops console's version. On the ops console the client is another Omega tenant
+with their own portal to see it in. Here CIR's customer has no Omega account
+at all, so the project belongs to CIR and the customer's name rides in
+`client`.
+
+### Sample mode
+
+`delivery.sampleData: true` fills the block and the queue with an illustrative
+book of work — seven live referrals across eight service lines, plus one
+delivered. It renders **only while the collection is empty for this org** and
+paints a "Sample" ribbon. Status changes and editor handoff are disabled in
+sample mode, because there's nothing real to write to.
+
+It is deliberately imperfect: one referral never answered and 31h past a
+critical target, one blocked on the customer, two late, and two answered but
+never stamped. **A queue where everything is green teaches nobody how to read
+it**, and CIR's own people will check the ugly rows first.
+
+**Turn it off the moment the account carries real referrals.** It
+self-destructs on the first one, but don't rely on that if a demo is being
+screenshotted.
+
+### Checking it
+
+```
+node check-delivery.js
 ```
 
-If the Firestore `tools` collection is non-empty, it **replaces `SEED_TOOLS`
-entirely** — it does not merge. `SEED_TOOLS` currently carries 40 tools
-including `sitefinder`, which is new. If the `tools` collection was last
-imported before `sitefinder` was added, then:
+Loads `config.js` and `omega-delivery.js` into a DOM, runs the sample book
+through `analyse()`, and asserts the SLA states, the unmeasured gap, the
+per-service counting, the scope-map unpacking, that the rules' status list
+still matches `STATUS[]`, and that the collection is not `intake_projects`.
+30 assertions; exits non-zero on any failure. Run it after any config edit.
 
-- Site Finder is absent from the marketplace grid,
-- its pinned dashboard tile has nothing to render,
-- and `config.js` looks wrong when it isn't.
+---
 
-Walters never hit this because both its tools are old. CIR's trial is built
-around the newest tool in the registry, so this repo is the first one where a
-stale `tools` collection is a launch blocker rather than a cosmetic gap.
+## Signing in from clearskyomega.com
 
-**Check:** open the marketplace and count. Fewer than 40 tools, or no Site
-Finder under *Interconnection & Grid* → run **Import / Update Applications** in
-the admin console, then reload.
+The gateway hands a signed-in user straight into this portal by appending
+`#omega_sso=<idToken>`. `omega-sso.js` takes the token out of the address bar,
+trades it at the Cloud Function for a custom token, signs in, and reloads
+clean. A normal visit has no hash and nothing runs.
 
-### 2. Deploy `firestore-capacity.rules`.
+Two tags in `<head>`, and **the order matters**:
 
-New file. Without it, Site Finder falls back to browser-local claims and shows
-"Local only" in the corner chip. It does not error, it does not refuse — it
-just silently stops sharing holds between reps, which is the only thing the
-ledger exists to do. Full reasoning is in the file header.
-
-Verify by signing in as two users in the same org and confirming a claim made
-by one leaves the other's inventory.
-
-### 3. Confirm Site Finder's dependencies are on the tool host.
-
-Site Finder is dark until all of these sit beside `clearsky-sitefinder.html`
-on `tools.csebuilders.com`:
-
-```
-omega-capacity-ledger.js    allocation math + shared claims
-omega-listings-source.js    property providers
-omega-comed-layers.js       hosting capacity / C&I / Illinois Shines
-ci-industrial.js            C&I parcel bundle      (falls back to tools host)
-ilshines-sites.js           Illinois Shines bundle (same fallback)
+```html
+<script>…inline veil guard…</script>
+<script type="module" src="https://clearskyomega.com/omega-sso.js"></script>
 ```
 
-Per the current parcel-layer status, DuPage and Lake are built, McHenry is
-unconfirmed and Cook is still failing. **Cook is the county a demo will reach
-for first.** If it's still empty on Sep 1, drive the demo through DuPage or
-Lake and say why, rather than letting them search Chicago and find nothing.
+**Why the inline guard exists.** `omega-sso.js` is a module, so it is deferred
+and *cannot* run first however high it sits. Without the guard, the portal's
+own auth observer fires, paints the sign-in card, and only then does the SSO
+reload happen — so a user arriving from clearskyomega.com watches a login
+screen flash past on their way in, which reads as "it logged me out". The
+guard hides `#auth-screen` for that one paint, and removes itself after 6
+seconds so a failed exchange doesn't strand somebody on a blank page.
 
-### 4. Authorize both domains in Firebase.
+Verified headlessly: the veil appears only when the URL carries
+`#omega_sso=`, and a normal load is untouched.
+
+**Why the module is loaded from clearskyomega.com and not copied here.** One
+copy, on the gateway, shared by every hand-off target. A local copy would rot
+the first time the exchange URL changes — and the header of that file says the
+v1 Cloud Function URL is the thing most likely to move.
+
+On any failure both are inert and the normal sign-in card appears. The worst
+case is the sign-in the user would have had anyway.
+
+**Before this works:** this portal's origin has to be an authorized domain in
+Firebase Auth, and the `omegaSso` function has to be deployed in
+`clearsky-portal`. Neither is done from this repo.
+
+---
+
+## ⚠ Before this goes live
+
+### 1. Confirm `sitefinder` is in the deployed catalog.
+
+`OMEGATools.hydrate()` **replaces** `SEED_TOOLS` wholesale when the Firestore
+`tools` collection is non-empty — it does not merge. `SEED_TOOLS` carries 40
+tools including `sitefinder`, which is new. A `tools` collection imported
+before `sitefinder` was added means Site Finder is absent from the marketplace,
+its pinned tile has nothing to render, and `config.js` looks wrong when it
+isn't.
+
+**Check:** fewer than 40 tools in the marketplace, or no Site Finder under
+*Interconnection & Grid* → run **Import / Update Applications**, then reload.
+
+### 2. Deploy the Firestore rules — now four fragments.
+
+```
+firebase deploy --only firestore:rules
+```
+
+Confirm `termsAcceptances`, `financeOffers`, `capacityAllocations` **and
+`referrals`** all appear in Firebase Console → Firestore → Rules.
+
+`firestore-terms.rules` still matters most: without it the terms gate fails
+closed and **nobody can sign in, on any tenant**.
+
+`firestore-delivery.rules` fails asymmetrically, and it's worth knowing which
+half: a missing rule denies **reads**, so the queue paints empty and looks
+exactly like "no referrals yet" — check the browser console, the module names
+the refused collection. **Writes** fail loudly with a message naming the file,
+so the intake form is the honest half.
+
+### 3. Deploy `storage.rules` — this is a SEPARATE deploy.
+
+```
+firebase deploy --only storage
+```
+
+`--only firestore:rules` does **not** touch Storage. Miss this and uploads on
+`/intake.html` fail with `storage/unauthorized` while the referral itself
+saves fine — so the record appears with no files attached and nothing says
+why.
+
+Also confirm `firebase.json` has a storage entry:
+
+```json
+"storage": { "rules": "storage.rules" }
+```
+
+Without it the CLI has nothing to deploy and reports success on an empty set
+of targets, which reads like it worked.
+
+**Storage rules cannot call `userOrg()`.** Different ruleset, no access to
+your Firestore helpers, no way to import them. The org is derived from the
+caller's email domain instead. That matters here because CIR has two sign-in
+domains — `orgFor()` in `storage.rules` maps
+`cleantechindustryresources.com` → `cleantechir.com`. **Keep it in step with
+`allowedDomains` in `config.js`**, or a user on the second domain uploads
+nothing and is told only "unauthorized".
+
+### 4. Confirm Site Finder's dependencies are on the tool host.
+
+Site Finder is dark until these sit beside `clearsky-sitefinder.html` on
+`tools.csebuilders.com`:
+
+```
+omega-capacity-ledger.js    omega-listings-source.js    omega-comed-layers.js
+ci-industrial.js            ilshines-sites.js
+```
+
+DuPage and Lake are built; McHenry is unconfirmed and Cook is still failing.
+**Cook is the county a demo reaches for first.** If it's still empty on Sep 1,
+drive the demo through DuPage or Lake and say why, rather than letting them
+search Chicago and find nothing.
+
+### 5. Authorize both domains in Firebase Auth.
 
 Console → Authentication → Settings → Authorized domains. Google sign-in fails
-without this. The Firebase block in `config.js` is the live `clearsky-portal`
-project — no placeholders — so this is the one step standing between upload and
-a working sign-in.
-
-### 5. Deploy the other two rules files.
-
-`firestore-terms.rules` matters most: without it the terms gate fails closed and
-**nobody can sign in, on any tenant**. `firestore-assets.rules` is inert for
-this tenant (the block is disabled) but belongs in the merged file anyway.
+without this, and so does the SSO handoff.
 
 ### 6. Confirm `userOrg()` resolves both CIR domains to the same orgId.
 
-Everything here is scoped to `orgId: 'cleantechir.com'`, but sign-ins may
-arrive on `cleantechindustryresources.com`. If `userOrg()` derives the org from
-the raw email domain rather than from the tenant config, a
-`@cleantechindustryresources.com` user authenticates fine and then sees an
-**empty workspace** — their reads are scoped to an org nobody wrote to. Check
-this before the second domain is used in anger; it is the most likely way this
-deployment fails in a way that looks like a data problem instead of a config
-problem.
+Everything is scoped to `orgId: 'cleantechir.com'`, but sign-ins may arrive on
+`cleantechindustryresources.com`. If `userOrg()` derives the org from the raw
+email domain rather than from the tenant config, that user authenticates fine
+and sees an **empty workspace** — reads scoped to an org nobody wrote to. This
+is the most likely way this deployment fails in a way that looks like a data
+problem instead of a config problem.
 
-### 7. Seed or import their projects with `orgId: 'cleantechir.com'`.
-
-Otherwise the portal authenticates fine and shows an empty pipeline.
-
-### 8. Resolve `isConsoleViewer()` before this account carries real sites.
+### 7. Resolve `isConsoleViewer()` before this account carries real referrals.
 
 Two hardcoded domains currently get read access to every tenant's `/projects`
-documents. CIR works national portfolios for named developers; their site list
-is the commercially sensitive part of their business. This was already flagged
-on the platform — it is more pointed here than it was for Walters.
+documents. That was already a flagged platform risk. It is sharper here: CIR's
+referrals name **their customers' projects**, and the editor projects created
+from them carry the customer name in `client`. A cross-org read of `/projects`
+is a read of who CIR is working for.
+
+### 8. Decide on sample data before the demo.
+
+`delivery.sampleData: true` ships on so the block isn't six empty cards on
+first sign-in. Turn it off if the account will carry real referrals from day
+one.
 
 ---
 
 ## Access rules
 
-Primary domain is `cleantechir.com`. **A second domain is open**, which is a
-departure from the Walters repo and is deliberate:
+Primary domain is `cleantechir.com`. **A second domain is open**, deliberately:
 
-| Domain | Who | Why open |
-|---|---|---|
-| `cleantechir.com` | CIR, short brand domain | primary; site footer and `connect@` |
-| `cleantechindustryresources.com` | CIR, long-form domain | published as their inbound contact address; staff addresses appear on both |
+| Domain | Why open |
+|---|---|
+| `cleantechir.com` | primary; site footer and `connect@` |
+| `cleantechindustryresources.com` | published as their inbound contact address; staff addresses appear on both |
 
 Walters got one domain because its sister brands had no separate mail presence.
-CIR is the opposite case — both domains are demonstrably in live use for staff
-mail, and opening only the short one would refuse a real fraction of the trial
-team with a message that reads like the portal is broken.
+CIR is the opposite case — both are in live use for staff mail, and opening
+only the short one would refuse a real fraction of the trial team with a
+message that reads like the portal is broken.
 
 Both land in the **same** workspace: `orgId` is pinned to `cleantechir.com`
-regardless of which address signs in, so there is no data split. See pre-launch
-item 6 — the pinning has to hold in the Firestore rules too, not just here.
+regardless of which address signs in. See pre-launch items 3 and 6 — that
+pinning has to hold in the Firestore rules *and* in `storage.rules`, not just
+here.
 
-If the trial team turns out to sit entirely on one domain, drop the other. Their
-legal entity, Solar Industry Resources LLC, has no observed mail domain of its
-own; don't pre-open one.
+Their legal entity, Solar Industry Resources LLC, has no observed mail domain
+of its own; don't pre-open one.
 
 `csebuilders.com` and `clearsky-usa.com` may preview and survive expiry.
 
-To admit an individual outside address — a client-side engineer sitting in on a
-session, say — add the address rather than opening their whole domain:
-
-```js
-allowedEmails: ['someone@example.com']
-```
+Individual outside addresses go in `allowedEmails`, rather than opening a whole
+domain.
 
 ---
 
 ## Tools during the trial
 
-The **entire catalog is visible**. Anything this account can't use renders with
-an "Upgrade" badge and a mailto to `dev@clearsky-usa.com`.
-
-Unlocked for CIR:
+Entire catalog visible; anything locked renders with an "Upgrade" badge and a
+mailto to `dev@clearsky-usa.com`.
 
 | Key | Tool | Category | Tier | Notes |
 |---|---|---|---|---|
@@ -245,192 +483,151 @@ Unlocked for CIR:
 | `editor` | BESS Site Map | design | STANDARD (1) | pinned |
 
 All three are in `requiredTools` as well as `unlockedTools`, so all three tiles
-are on "My Applications" the moment they sign in — required tools render before
-any user pinning and can't be removed. The order is the intended walkthrough:
-**find the site → read the grid → design the asset.**
-
-### How the gate works
+are on My Applications at first sign-in. Order is the intended walkthrough:
+**find the site → read the grid → design the asset** — and with the delivery
+console directly below, the referral that started the job sits in the same
+view.
 
 ```
-unlocked = requiredTools.has(key)
-        || unlockedTools.has(key)
-        || tierLevel >= (tool.tier ?? 1)
+unlocked = requiredTools.has(key) || unlockedTools.has(key) || tierLevel >= (tool.tier ?? 1)
 ```
 
-Tiers are `ALL=0`, `STANDARD=1`, `DELUXE=2`, `ENTERPRISE=3`. `tierLevel` is
-**-1** so nothing passes on tier alone and access comes only from the two lists.
+`tierLevel` is **-1** so nothing passes on tier alone. This catches `gridatlas`
+too, which is `TIER.ALL` and would otherwise open for free. **Deleting a key
+from `unlockedTools` locks the tool even if it's still in `requiredTools`** —
+keep the two in sync.
 
-Note this catches `gridatlas` too. It is `TIER.ALL`, so on any tenant with
-`tierLevel: 0` it would open for free — but -1 sits below zero, so it has to be
-listed explicitly. **Deleting a key from `unlockedTools` locks the tool even if
-it's still in `requiredTools`.** Keep the two lists in sync.
-
-`tierLevel: 0` was the tempting shortcut here and is the wrong call: it would
-also open `comedcap` (ComEd Capacity Finder), which is the *one-address lookup*
-version of Site Finder. Having both on the dashboard invites the question of why
-there are two ComEd tools, and the honest answer — that one is a downgrade of
-the other — is not the note to end a demo on.
+`tierLevel: 0` was the tempting shortcut and is wrong: it would also open
+`comedcap`, the one-address-lookup version of Site Finder. Two ComEd tools on
+one dashboard invites a question whose honest answer is that one is a downgrade
+of the other.
 
 ### ⚠ Site Finder is ComEd-only. CIR is national.
 
-This is the commercial risk in this trial and it should be named in the kickoff
-call, not discovered in week three.
+The commercial risk in this trial, and it belongs in the kickoff call rather
+than week three.
 
-Site Finder browses **northern Illinois** C&I property ranked by deliverable kW,
-shaded from ComEd's published hosting-capacity map. It is territory-bound by
-data, not by licence: outside ComEd there is no hosting-capacity layer to shade
-against and the tool has nothing to rank.
+Site Finder browses **northern Illinois** C&I property shaded from ComEd's
+published hosting-capacity map. It's territory-bound by data, not licence:
+outside ComEd there's no capacity layer to shade against.
 
-CIR is headquartered in Vermont and its published work spans national
-portfolios — 450+ sites for a Virginia developer, high-volume residential
-through mega-scale single-site. **A CIR user's first instinct will be to search
-their own footprint, and they will get an empty map.**
+CIR is Vermont-headquartered and works national portfolios — 450+ sites for a
+Virginia developer, high-volume residential through mega-scale. **Their first
+instinct will be to search their own footprint and get an empty map.**
 
-Two ways to play it, both fine, but pick one before the demo:
+Two framings, both fine, pick one before the demo:
 
-1. **Frame it as the ComEd pilot.** Site Finder is the worked example of what
-   the platform does in a territory where the utility publishes capacity data.
-   The pitch is the method, and ComEd is where it's live today. This is honest
-   and it's the reason `gridatlas` — which is national — is pinned beside it.
-2. **Lead with Grid Atlas and Editor**, and hold Site Finder back as the
-   "here's what a fully-instrumented territory looks like" moment.
+1. **The ComEd pilot.** Site Finder is the worked example of what the platform
+   does where the utility publishes capacity data. The pitch is the method.
+2. **Lead with Grid Atlas and the editor**, hold Site Finder as the
+   "here's a fully-instrumented territory" moment.
 
-What *doesn't* work is putting a national services firm in front of an Illinois
-map with no framing. Grid Atlas is the tool that actually covers their
-footprint — substations, lines, plants, EIA data, nationwide — so it carries
-the weight in every region CIR actually works, and Site Finder is the depth
-demo.
+Grid Atlas is national — substations, lines, plants, EIA — so it carries the
+weight everywhere CIR actually works.
 
-**If this trial is meant to prove out a specific region for them, ask which one
-now.** If it's ComEd territory, this repo is already right. If it's PJM or
-ISO-NE — plausible for a Vermont firm — Site Finder is the wrong third tool and
-`sitediscovery` (Site Discovery & Screening, ranks a pipeline the tenant
-already assembled, no utility data dependency) is the better swap. That's a
-two-line edit to `unlockedTools` and `requiredTools`.
+**If the trial is meant to prove out a specific region, ask which one now.**
+ComEd territory: ship as-is. PJM or ISO-NE, plausible for a Vermont firm:
+`sitediscovery` (ranks a pipeline the tenant already assembled, no utility data
+dependency) is the better third tool, and it pairs naturally with the delivery
+console since the referrals *are* the pipeline. Two-line edit.
 
-### Natural next unlocks
+### Marketplace hand-off is off for now
 
-`comedcap` if they stay in ComEd territory and want the one-address lookup;
-`interconnect` (Interconnection Screener) and `intake` (Project Intake) if the
-conversation moves toward CIR routing work into ClearSky. `proforma` is the
-obvious ask if they start being asked for economics by their own clients.
-
----
-
-## Note on the logo
-
-Your file is a white wordmark on transparency, with the blue C|R block on the
-left. **It would have been invisible in the portal.** The sign-in card is
-`rgba(255,255,255,.96)` and the topbar chip is `#fff` — on both, everything
-except the blue square would have vanished, and it would have looked like a
-broken image rather than a colour problem.
-
-So it ships twice:
-
-- **`cir-logo.png`** — the wordmark recoloured to `#0F2733`, the portal's own
-  body-text colour, so it sits at the same weight as the interface text beside
-  it. The blue block and the white `C|R` inside it are untouched. Trimmed to
-  content with 6px of transparent padding. Used for the topbar chip, the
-  sign-in card, and `exportBrand` (proposals and PDFs are white paper too).
-- **`cir-logo-white.png`** — your original, trimmed the same way. For dark
-  backgrounds. Nothing currently points at it; it's there so the next dark
-  surface doesn't need this work redone.
-
-**Sizing.** The recoloured mark is 490×170 (2.88:1). The sign-in card renders
-at a fixed 88px tall inside 420px of card, leaving ~324px usable — this lands
-at 254px, comfortable. In the 22px topbar chip it's ~63px wide, well inside the
-150px mobile clamp.
-
-If CIR can supply a dark-text or SVG original, drop it in under the same
-filename and nothing else changes.
-
-`clientName` is **Cleantech Industry Resources** — the trading name, not the
-legal entity (Solar Industry Resources, LLC). If a contract or a proposal export
-needs the legal name, `exportBrand.name` is a one-line edit and is separate from
-the on-screen `clientName` for exactly this reason.
+`delivery.marketplaceKey` is `null`. CIR's referrals are their **customers'**
+projects, so pushing one into ClearSky's finance marketplace means brokering
+somebody else's deal. That's a commercial conversation before it's a config
+value — set it to `'financing'` once you've had it.
 
 ---
 
 ## Why the Asset Owner Command Center is off
 
-Walters got `omega-assets.js` because they sell the equipment today and want to
-own or finance it tomorrow — offers received, assets on the books, portfolio
-P&L, IRR.
+Walters got `omega-assets.js` because they sell equipment today and want to own
+or finance it tomorrow. CIR is the opposite shape: they advance projects for
+developers, builders, landowners and financiers and hand them over. There's no
+portfolio on their balance sheet for the block to report on, and enabled it
+would show four permanently empty cards.
 
-CIR's business is the opposite shape. They are a services firm: they advance
-projects for developers, builders, landowners and financiers, with transparent
-cost and no change orders, and they hand the project over. There is no portfolio
-on their balance sheet for the block to report on. Enabled, it would show four
-permanently empty cards.
+The sample is worse than the empty state, not better — a Southern California
+C&I storage portfolio built for a Southern California distributor. In front of
+a Vermont firm running national portfolios it reads as a mistake.
 
-The sample data is worse than the empty state, not better: it's a Southern
-California C&I storage portfolio built for a Southern California distributor. In
-front of a Vermont firm running national portfolios it reads as a mistake — and
-a services audience checks whose numbers those are first.
+`omega-assets.js` still ships so `index.html` stays comparable across tenants;
+the module checks `enabled` before it mounts anything. Verified headlessly on
+this deployment: the delivery block mounts directly under My Applications, and
+the assets block does not mount at all.
 
-`assets.enabled: false`, `sampleData: false`. If CIR ever does start holding
-assets, flip `enabled` and seed real projects — leave `sampleData` off.
+---
 
-The stock dashboard — site count, stage mix, storage quoted — is the pipeline
-view, and pipeline is what CIR actually manages.
+## Note on the logo
+
+Your file is a white wordmark on transparency with the blue C|R block. **It
+would have been invisible in the portal** — the sign-in card is
+`rgba(255,255,255,.96)` and the topbar chip is `#fff`, so everything except the
+blue square would have vanished and looked like a broken image.
+
+- **`cir-logo.png`** — wordmark recoloured to `#0F2733`, the portal's own body
+  text colour, so it sits at the same weight as the interface text beside it.
+  Blue block and the white C|R inside it untouched. Trimmed with 6px padding.
+  Used for the topbar chip, sign-in card, and `exportBrand`.
+- **`cir-logo-white.png`** — your original, trimmed the same way, for dark
+  backgrounds. Nothing points at it yet.
+
+490×170 (2.88:1). At the card's fixed 88px height it lands at 254px inside
+~324px usable. In the 22px topbar chip, ~63px, well inside the 150px mobile
+clamp.
+
+`clientName` is the trading name, not the legal entity. `exportBrand.name` is
+separate for exactly that reason if a proposal needs *Solar Industry Resources,
+LLC*.
 
 ---
 
 ## Terms of Service gate
 
-Unchanged from every other tenant. New accounts must accept before the portal
-renders: a consent checkbox on the sign-up form, plus the real enforcement — a
-gate that runs after authentication and before the app renders, because a
+Unchanged from every other tenant: a consent checkbox on sign-up, plus the real
+enforcement — a gate after authentication and before the app renders, because a
 checkbox would miss Google sign-in entirely and would miss version bumps.
 
-Acceptance is recorded at `termsAcceptances/{uid}` with uid, email, orgId,
-version and a server timestamp. Bump `TERMS_VERSION` in `omega-terms.js` to
-re-prompt everyone.
-
-### ⚠ Deploy the rules
-
-```
-firebase deploy --only firestore:rules
-```
-
-Until `termsAcceptances` is live in Firebase the acceptance write returns
-permission-denied and the gate **fails closed — nobody can sign in, on any
-tenant**. Confirm `termsAcceptances`, `financeOffers` and `capacityAllocations`
-all appear in Firebase Console → Firestore → Rules before calling it done.
+Acceptance at `termsAcceptances/{uid}`. Bump `TERMS_VERSION` in `omega-terms.js`
+to re-prompt everyone.
 
 ### Not legal advice
 
-The terms are a standard SaaS starting point covering platform IP, licence
-scope, use restrictions, customer data ownership, confidentiality, trial terms,
-and an engineering-output disclaimer stating that generated site plans,
-one-lines and pro formas are estimates rather than sealed engineering
-documents. **Have a lawyer review before relying on any of it.** Two
-placeholders are marked REVIEW in the file: governing law and venue (currently
-Iowa) and the formal notice address (currently `dev@clearsky-usa.com`).
+Standard SaaS starting point. **Have a lawyer review before relying on any of
+it.** Two placeholders marked REVIEW: governing law and venue (Iowa) and the
+notice address.
 
-That disclaimer deserves a second look for this tenant specifically. CIR sells
-**systems engineering** as its product and stamps deliverables for clients. A
-services firm handing a ClearSky-generated one-line to its own customer is a
-sublicensing question the current terms don't clearly address, and the
-engineering-output disclaimer protects ClearSky without saying anything about
-what CIR may redistribute. Worth asking the lawyer about before the trial
-converts.
+Two points need a second look for **this** tenant specifically, both sharper
+than they were for Walters:
+
+**Sublicensing.** CIR sells systems engineering and stamps deliverables for its
+own clients. A services firm handing a ClearSky-generated one-line to its
+customer is a redistribution question the current terms don't clearly address —
+the engineering-output disclaimer protects ClearSky without saying anything
+about what CIR may pass on.
+
+**Their customers' data.** The delivery console means this account now holds
+information about third parties who never agreed to anything: contact names,
+emails, site addresses and uploaded files belonging to CIR's clients. The
+customer-data ownership clause was written for a tenant's own project data. Ask
+the lawyer whether it covers a tenant storing *its customers'* data, and
+whether a DPA belongs in the conversion paperwork.
 
 ---
 
 ## Open questions for you
 
-1. **Which territory is this trial really about?** The single most consequential
-   answer. If it's ComEd, ship as-is. If it's ISO-NE or PJM, swap `sitefinder`
-   for `sitediscovery` before Sep 1. Everything in the tools section above hangs
-   on this.
-2. **Who is the trial sponsor?** `supportEmail` points at the public
-   `connect@cleantechir.com`, which is a slow route even over 60 days.
-3. **Whose sites go in?** CIR's own prospecting, or their clients'? If it's
-   client work, one orgId for all of CIR means every client's pipeline sits in
-   one workspace, visible to every CIR user. That's probably fine internally and
-   probably not fine contractually. Ask before they import.
-4. **Is 60 days plus no expiry lock what you meant?** With `lockOnExpiry: false`
-   the account keeps working from Oct 31 with a grey banner. Combined with the
-   pre-start access noted above, the practical window is "now until you turn it
-   off". Fine if intended.
+1. **Are the ten service lines right?** Assembled from public material. Wrong
+   or missing lines are the first thing CIR will notice, and keys are painful
+   to change once referrals carry them.
+2. **Which territory is this trial about?** ComEd → ship as-is. ISO-NE or PJM →
+   swap `sitefinder` for `sitediscovery` before Sep 1.
+3. **Who is the trial sponsor?** `supportEmail` points at the public
+   `connect@cleantechir.com`, slow even over 60 days.
+4. **One workspace for all of CIR's clients?** Every CIR user sees every
+   referral, including which developers CIR is working for and on what. Fine
+   internally, possibly not fine contractually. Ask before they import.
+5. **Is 60 days plus no expiry lock what you meant?** With
+   `lockOnExpiry: false` and no pre-start block, the practical window is "now
+   until you turn it off".

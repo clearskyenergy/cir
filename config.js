@@ -106,16 +106,124 @@ window.CLEARSKY_CONFIG = {
        so a portfolio P&L and an offer funnel would be empty forever, or worse,
        filled with sample numbers that describe somebody else's balance sheet.
 
-       The stock dashboard — site count, stage mix, storage quoted — is the
-       pipeline view, and that is the right one for this account.
-
        If CIR does start owning: set enabled true, sampleData false, and seed
-       real projects. Do NOT turn sampleData on for a demo here — the sample
+       real projects. Do NOT turn sampleData on for a demo here — that sample
        is a Southern California C&I portfolio and CIR is a Vermont firm working
        national portfolios. It would read as a mistake.                     */
     assets: {
       enabled:      false,
       sampleData:   false
+    },
+
+    /* ── SERVICE DELIVERY CONSOLE ─────────────────────────────────────────
+       Drives the dashboard block added by /omega-delivery.js, plus the two
+       pages it links to: /intake.html (log a referral) and /queue.html (what
+       is in the queue, per service line).
+
+       This is the block that makes the account CIR-shaped. The stock
+       dashboard tracks sites a tenant is developing for itself. CIR develops
+       and engineers OTHER people's projects, so the questions that matter are
+       what came in, how long it has been sitting, which service line it lands
+       on, and what is ready to draw.
+
+       ⚠ NOT THE OMEGA PROJECT INTAKE.
+       `collection` below is this tenant's own book of work. It is NOT
+       `intake_projects`, which is ClearSky's delivery queue — the ops console
+       reads that, staff are measured on its SLA, and it carries commission
+       and quoting. Pointing this at `intake_projects` would drop CIR's
+       customers into ClearSky's worklist, start a ClearSky response clock on
+       jobs nobody at ClearSky owes a reply to, and skew every SLA average on
+       the ops console. On a trial account that is doubly wrong. Deploy
+       firestore-delivery.rules for this collection and leave the two apart.
+
+       Graduating CIR onto the real intake later is a document copy, not a
+       translation: the status KEYS in omega-delivery.js deliberately match
+       intake_projects' vocabulary even though the labels read differently.  */
+    delivery: {
+      enabled:     true,
+      collection:  'referrals',     // must match firestore-delivery.rules
+                                    // AND the folder in storage.rules
+      insertAfter: 'apps',          // sits directly under My Applications
+      sampleData:  true,            // see the note at the end of this block
+      uploads:     true,            // false ⇒ links only, no Firebase Storage
+
+      title:    'Service Delivery',
+      subtitle: 'Projects your customers have referred to you, by service line.',
+
+      intakeHref: '/intake.html',
+      queueHref:  '/queue.html',
+
+      /* ── REPLY TARGETS ────────────────────────────────────────────────
+         Wall-clock hours, not business hours. A standard referral landing
+         6pm Friday is amber by Saturday lunchtime with nobody at fault.
+         When volume makes that unfair, add a business-hours calendar in
+         omega-delivery.js — do NOT just lengthen the target, which would
+         also slacken the weekday number that actually matters.
+
+         CIR's own pitch is a 24-hour work cycle and deliverables in a third
+         of the usual time, so a 24h standard target is their claim, not an
+         arbitrary one. If they'd rather not be measured against their own
+         marketing during a trial, raise it before the demo — but raising it
+         quietly after the first miss is worse than setting it honestly now. */
+      sla:          { critical: 2, rush: 8, standard: 24 },
+      warnAt:       0.6,            // amber at 60% of target, red past it
+      deliveryDays: { critical: 3, rush: 7, standard: 14 },
+
+      /* ── SERVICE LINES ───────────────────────────────────────────────
+         CIR's published catalogue, from cleantechir.com/product and their
+         own descriptions of what they sell. These keys are written onto
+         every referral, so RENAMING A KEY ORPHANS EVERY RECORD THAT USED IT
+         — the queue tags orphans in red under "Needs scoping" rather than
+         hiding them, but it is still a migration. Change labels freely;
+         change keys deliberately.
+
+         Confirm this list with CIR in the kickoff call. It is assembled from
+         public material, and the one thing a services firm notices first is
+         a catalogue of its own work with something missing.               */
+      services: [
+        { key:'siting',        label:'Siting & screening',
+          desc:'Early site identification and screening, EPSA-style' },
+        { key:'diligence',     label:'Site diligence / DDR',
+          desc:'Due diligence reports, risk and constraints' },
+        { key:'engineering',   label:'Systems engineering',
+          desc:'Late-stage engineering, one-lines, energy modeling' },
+        { key:'interconnection', label:'Interconnection',
+          desc:'Applications, studies and utility comment response' },
+        { key:'permitting',    label:'Permitting & AHJ',
+          desc:'Permit packages and authority comment response' },
+        { key:'estimating',    label:'Estimating & bidding',
+          desc:'Construction estimation, BOM and bid support' },
+        { key:'financial',     label:'Financial modeling',
+          desc:'Project economics and investor-facing models' },
+        { key:'sitereview',    label:'Dispatch: site review',
+          desc:'Field dispatch to walk and report on a site' },
+        { key:'construction',  label:'Construction management',
+          desc:'CaaS and owner\u2019s-engineer support through build' },
+        { key:'legal',         label:'Legal & land support',
+          desc:'Title, land and legal consulting coordination' }
+      ],
+
+      /* Which catalog tool the block points at for marketplace hand-off.
+         null for now — see the README. CIR's referrals are their customers'
+         projects, so pushing one into ClearSky's finance marketplace means
+         brokering somebody else's deal, and that is a commercial
+         conversation before it is a config value. */
+      marketplaceKey: null,
+
+      /* sampleData fills the block and the queue with an illustrative book
+         of work ONLY while the collection is empty for this org, and paints
+         a "Sample" ribbon while it does. Status changes and editor handoff
+         are disabled in sample mode, because there is nothing real to write.
+
+         The sample is deliberately imperfect — one referral never answered,
+         one blocked on the customer, one answered-but-never-stamped, two
+         late. A queue where everything is green teaches nobody how to read
+         it, and CIR's own people will check the ugly rows first.
+
+         TURN THIS OFF the moment the account carries real referrals. It
+         self-destructs on the first one, but do not rely on that if a demo
+         is being screenshotted.                                          */
+      sampleData_note: 'see sampleData above'
     },
 
     /* Branding for customer-facing exports (proposals, PDFs). */

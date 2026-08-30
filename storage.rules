@@ -1,0 +1,111 @@
+rules_version = '2';
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ClearSky-OMEGA · Cloud Storage rules — referral attachments
+
+   ⚠ THIS IS A SEPARATE DEPLOY FROM firestore.rules. That is the single
+   thing people get wrong here.
+
+     firebase deploy --only storage          ← this file
+     firebase deploy --only firestore:rules  ← everything else in this repo
+
+   `firebase deploy --only firestore:rules` does NOT touch Storage. If you
+   deploy the Firestore rules and stop, uploads on /intake.html fail with
+   storage/unauthorized while the referral itself saves fine — so the record
+   appears with no files attached and nothing says why. Check the browser
+   console for `storage/unauthorized` before assuming the upload silently
+   worked.
+
+   Also confirm `storage` has a `rules` entry in firebase.json:
+
+     "storage": { "rules": "storage.rules" }
+
+   Without it the CLI has nothing to deploy and reports success on an empty
+   set of targets, which reads like it worked.
+
+   ─────────────────────────────────────────────────────────────────────────
+   PATH
+   ─────────────────────────────────────────────────────────────────────────
+   /intake.html writes to:
+
+       {collection}/{orgId}/{referralId}/{filename}
+
+   where {collection} is `tenant.delivery.collection` from /config.js. The
+   folder name below must match it. Change one and change the other.
+
+   ─────────────────────────────────────────────────────────────────────────
+   THE ORG CHECK IS NOT userOrg()
+   ─────────────────────────────────────────────────────────────────────────
+   Storage rules are a separate ruleset with no access to the Firestore
+   helpers — userOrg(), isAdmin() and the rest do not exist here and cannot
+   be imported. The org is derived from the caller's email domain instead,
+   which is what userOrg() does anyway for these tenants.
+
+   That means a tenant whose orgId is NOT their email domain (a tenant with
+   a second allowed sign-in domain, for instance) will fail the check even
+   though Firestore lets them through. If that applies, either list the extra
+   domains in `orgAliases` below, or accept that those users attach links
+   rather than uploads.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified != false;
+    }
+
+    function emailDomain() {
+      return request.auth.token.email.split('@')[1].lower();
+    }
+
+    /* Extra sign-in domains that map onto a single orgId. Mirrors
+       `allowedDomains` in /config.js: without this, a user signing in on the
+       tenant's secondary domain uploads nothing and is told only
+       "unauthorized".
+
+       Format: 'signin-domain' => 'orgId'. Keep it short; every entry is a
+       door. */
+    function orgFor(dom) {
+      return dom == 'cleantechindustryresources.com' ? 'cleantechir.com' : dom;
+    }
+
+    /* ClearSky staff previewing a deployment. Mirrors adminDomains in
+       /config.js. */
+    function isPlatformStaff() {
+      return signedIn() &&
+        (emailDomain() == 'clearsky-usa.com' || emailDomain() == 'csebuilders.com');
+    }
+
+    /* ── Referral attachments ──────────────────────────────────────────
+       Folder name MUST match tenant.delivery.collection in /config.js. */
+    match /referrals/{orgId}/{referralId}/{fileName} {
+
+      function callerOwnsOrg() {
+        return signedIn() && orgFor(emailDomain()) == orgId;
+      }
+
+      allow read: if callerOwnsOrg() || isPlatformStaff();
+
+      /* 25 MB matches the client-side guard in /intake.html. The limit is
+         about the browser upload, not about Storage: past this a field
+         connection stalls long enough that people reload the form and lose
+         it. Raising one without the other means the form accepts a file the
+         rules then refuse, which is the worst of both. */
+      allow write: if callerOwnsOrg()
+                   && request.resource.size < 25 * 1024 * 1024;
+
+      /* Attachments are evidence of what a job started from. Removing one
+         from a delivered package rewrites the record of what was supplied,
+         so deletion is an admin operation done from the console rather than
+         a button on a queue row. */
+      allow delete: if isPlatformStaff();
+    }
+
+    /* Everything else in the bucket stays closed. An open default here is
+       how a Storage bucket becomes a public file host. */
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
